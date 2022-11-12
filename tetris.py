@@ -69,20 +69,41 @@ def Draw():
 
 
 def MatrixMulti(mR, mV):
-	lResult = []
+	iResultList = []
 	for tRow in mR:
-		lResult.append(sum(map(lambda t: t[0] * t[1], zip(tRow, mV))))
-		print lResult
+		iResultList.append(sum(map(lambda t: t[0] * t[1], zip(tRow, mV))))
+	return iResultList
 
 
 class CBlock(object):
+	BLOCK_TYPE_T = "T"
+	BLOCK_TYPE_I = "I"
+
+	BLOCK_TYPE_2_POINTS = {
+		BLOCK_TYPE_T: (
+			((3, 21), (4, 21), (5, 21), (4, 22)),
+			(4, 21)
+		),
+
+		BLOCK_TYPE_I: (
+			((3, 22), (4, 22), (5, 22), (6, 22)),
+			(4.5, 22.5)
+		),
+	}
+
 	def __init__(self):
+		self.m_sType = ""
 		self.m_lPointList = []
 		self.m_lRotatePoint = []
 
-	def SetPoints(self, lPointList, lRotatePoint):
-		self.m_lPointList = lPointList
-		self.m_lRotatePoint = lRotatePoint
+	def SetType(self, sType):
+		dType2Points = CBlock.BLOCK_TYPE_2_POINTS
+		if sType not in dType2Points:
+			raise ValueError, sType
+		self.m_sType = sType
+		tPoints = dType2Points[sType]
+		self.m_lPointList = [list(t) for t in tPoints[0]]
+		self.m_lRotatePoint = list(tPoints[1])
 
 	def GetPointList(self):
 		return self.m_lPointList
@@ -113,8 +134,9 @@ class CBlock(object):
 				(1, 0, fRY - fRX),
 				(0, 0, 1),
 			)
-		for iCol, iRow in self.m_lPointList:
-			MatrixMulti(m, (iCol, iRow, 1))
+		for iIndex, (iCol, iRow) in enumerate(self.m_lPointList):
+			iResultList = MatrixMulti(m, (iCol, iRow, 1))
+			self.m_lPointList[iIndex] = iResultList[:2]
 
 	def Fall(self, bToBottom=False):
 		iTryTimes = 1 if not bToBottom else GROUND_GRID_SIZE[1] + 10
@@ -125,7 +147,6 @@ class CBlock(object):
 			for lPoint in self.m_lPointList:
 				lPoint[1] -= 1
 			self.m_lRotatePoint[1] -= 1
-			print "Fall"
 
 
 class CTetrisTest(object):
@@ -144,7 +165,7 @@ class CTetrisTest(object):
 
 	def Init(self):
 		#self.InitGround()
-		self.SpwanBlock(0)
+		self.SpwanBlock(CBlock.BLOCK_TYPE_I)
 
 	def InitGround(self):
 		iCol, iRow = GROUND_GRID_SIZE
@@ -185,15 +206,8 @@ class CTetrisTest(object):
 			)
 			pygame.draw.rect(g_oSurface, (255, 255, 255), oRect)
 
-	def SpwanBlock(self, iBlockType):
-		lPointList = [
-			[3, 21],
-			[4, 21],
-			[5, 21],
-			[4, 22],
-		]
-		lRotatePoint = [4, 21]
-		self.m_oBlock.SetPoints(lPointList, lRotatePoint)
+	def SpwanBlock(self, sBlockType):
+		self.m_oBlock.SetType(sBlockType)
 
 	def GetBlock(self):
 		return self.m_oBlock
