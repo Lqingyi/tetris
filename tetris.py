@@ -58,9 +58,9 @@ def ProcessEvent():
 	for oEvent in pygame.event.get(pygame.KEYDOWN):
 		sKey = pygame.key.name(oEvent.key)
 		if sKey == "down":
-			oTetrisTest.GetBlock().Fall()
+			oTetrisTest.FallBlock()
 		elif sKey == "up":
-			oTetrisTest.GetBlock().Rotate()
+			oTetrisTest.RotateBlock(True)
 
 
 def Draw():
@@ -99,11 +99,16 @@ class CBlock(object):
 	def SetType(self, sType):
 		dType2Points = CBlock.BLOCK_TYPE_2_POINTS
 		if sType not in dType2Points:
-			raise ValueError, sType
+			raise ValueError("sType:%s" % (sType,))
 		self.m_sType = sType
 		tPoints = dType2Points[sType]
-		self.m_lPointList = [list(t) for t in tPoints[0]]
-		self.m_lRotatePoint = list(tPoints[1])
+		self.UpdatePoints([list(t) for t in tPoints[0]], lRotatePoint=list(tPoints[1]))
+
+	def UpdatePoints(self, lPointList, lRotatePoint=None):
+		if lPointList:
+			self.m_lPointList = lPointList
+		if lRotatePoint:
+			self.m_lRotatePoint = lRotatePoint
 
 	def GetPointList(self):
 		return self.m_lPointList
@@ -117,7 +122,27 @@ class CBlock(object):
 	def CheckFall(self):
 		return True
 
-	def Rotate(self, bClockwise=True):
+	def GetRotateResult(self, bClockwise):
+		fRX, fRY = self.m_lRotatePoint
+		if bClockwise:
+			m = (
+				(0, 1, fRX - fRY),
+				(-1, 0, fRX + fRY),
+				(0, 0, 1),
+			)
+		else:
+			m = (
+				(0, -1, fRX + fRY),
+				(1, 0, fRY - fRX),
+				(0, 0, 1),
+			)
+		lPointList = []
+		for iIndex, (iCol, iRow) in enumerate(self.m_lPointList):
+			iResultList = MatrixMulti(m, (iCol, iRow, 1))
+			lPointList.append(iResultList[:2])
+		return lPointList
+
+	def Rotate(self, bClockwise):
 		if not self.CheckRotate(bClockwise):
 			return
 
@@ -206,12 +231,37 @@ class CTetrisTest(object):
 			)
 			pygame.draw.rect(g_oSurface, (255, 255, 255), oRect)
 
+	def CheckValid(self, lPointList):
+		self.m_iGroundPointList
+		iGroundPointList = self.m_iGroundPointList
+		iGroundGridW, iGroundGridH = GROUND_GRID_SIZE
+		for iCol, iRow in lPointList:
+			if not (0 <= iCol < iGroundGridW and iRow > 0):
+				return False
+			if iRow >= iGroundGridH:
+				continue
+			print iRow, iGroundGridW, iCol
+			if iGroundPointList[int(iRow * iGroundGridW + iCol)]:
+				return False
+		return True
+
 	def SpwanBlock(self, sBlockType):
 		self.m_oBlock.SetType(sBlockType)
 
+	def RotateBlock(self, bClockwise):
+		oBlock = self.m_oBlock
+		lPointList = oBlock.GetRotateResult(bClockwise)
+		if not self.CheckValid(lPointList):
+			return
+		oBlock.UpdatePoints(lPointList=lPointList)
+
+	def FallBlock(self, bToBottom=False):
+		oBlock = self.m_oBlock
+		oBlock.Fall(bToBottom=bToBottom)
+		pass
+
 	def GetBlock(self):
 		return self.m_oBlock
-
 
 
 if __name__ == "__main__":
