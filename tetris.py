@@ -49,10 +49,14 @@ def GameLoop():
 	Draw()
 
 
+def ExitGame():
+	pygame.quit()
+	sys.exit()
+
+
 def ProcessEvent():
 	if pygame.event.get(pygame.QUIT):
-		pygame.quit()
-		sys.exit()
+		ExitGame()
 
 	oTetrisTest = CTetrisTest.GetInstance()
 	for oEvent in pygame.event.get(pygame.KEYDOWN):
@@ -60,7 +64,13 @@ def ProcessEvent():
 		if sKey == "down":
 			oTetrisTest.FallBlock()
 		elif sKey == "up":
+			oTetrisTest.FallBlock(bToBottom=True)
+		elif sKey == "left":
+			oTetrisTest.RotateBlock(False)
+		elif sKey == "right":
 			oTetrisTest.RotateBlock(True)
+		elif sKey == "escape":
+			ExitGame()
 
 
 def Draw():
@@ -105,8 +115,7 @@ class CBlock(object):
 		self.UpdatePoints([list(t) for t in tPoints[0]], lRotatePoint=list(tPoints[1]))
 
 	def UpdatePoints(self, lPointList, lRotatePoint=None):
-		if lPointList:
-			self.m_lPointList = lPointList
+		self.m_lPointList = lPointList
 		if lRotatePoint:
 			self.m_lRotatePoint = lRotatePoint
 
@@ -115,63 +124,6 @@ class CBlock(object):
 
 	def GetRotatePoint(self):
 		return self.m_lRotatePoint
-
-	def CheckRotate(self, bClockwise):
-		return True
-
-	def CheckFall(self):
-		return True
-
-	def GetRotateResult(self, bClockwise):
-		fRX, fRY = self.m_lRotatePoint
-		if bClockwise:
-			m = (
-				(0, 1, fRX - fRY),
-				(-1, 0, fRX + fRY),
-				(0, 0, 1),
-			)
-		else:
-			m = (
-				(0, -1, fRX + fRY),
-				(1, 0, fRY - fRX),
-				(0, 0, 1),
-			)
-		lPointList = []
-		for iIndex, (iCol, iRow) in enumerate(self.m_lPointList):
-			iResultList = MatrixMulti(m, (iCol, iRow, 1))
-			lPointList.append(iResultList[:2])
-		return lPointList
-
-	def Rotate(self, bClockwise):
-		if not self.CheckRotate(bClockwise):
-			return
-
-		fRX, fRY = self.m_lRotatePoint
-		if bClockwise:
-			m = (
-				(0, 1, fRX - fRY),
-				(-1, 0, fRX + fRY),
-				(0, 0, 1),
-			)
-		else:
-			m = (
-				(0, -1, fRX + fRY),
-				(1, 0, fRY - fRX),
-				(0, 0, 1),
-			)
-		for iIndex, (iCol, iRow) in enumerate(self.m_lPointList):
-			iResultList = MatrixMulti(m, (iCol, iRow, 1))
-			self.m_lPointList[iIndex] = iResultList[:2]
-
-	def Fall(self, bToBottom=False):
-		iTryTimes = 1 if not bToBottom else GROUND_GRID_SIZE[1] + 10
-		while iTryTimes > 0:
-			iTryTimes -= 1
-			if not self.CheckFall():
-				continue
-			for lPoint in self.m_lPointList:
-				lPoint[1] -= 1
-			self.m_lRotatePoint[1] -= 1
 
 
 class CTetrisTest(object):
@@ -225,23 +177,24 @@ class CTetrisTest(object):
 			iCol, iRow = lPoint
 			oRect = pygame.Rect(
 				iCol * BLOCK_EDGE_LENGTH,
-				iGroundH - iRow * BLOCK_EDGE_LENGTH,
+				iGroundH - (iRow + 1) * BLOCK_EDGE_LENGTH,
 				BLOCK_EDGE_LENGTH,
 				BLOCK_EDGE_LENGTH,
 			)
 			pygame.draw.rect(g_oSurface, (255, 255, 255), oRect)
 
 	def CheckValid(self, lPointList):
-		self.m_iGroundPointList
 		iGroundPointList = self.m_iGroundPointList
 		iGroundGridW, iGroundGridH = GROUND_GRID_SIZE
 		for iCol, iRow in lPointList:
 			if not (0 <= iCol < iGroundGridW and iRow > 0):
+				print "return False area", iCol, iRow
 				return False
 			if iRow >= iGroundGridH:
+				print "return False H", iRow
 				continue
-			print iRow, iGroundGridW, iCol
 			if iGroundPointList[int(iRow * iGroundGridW + iCol)]:
+				print "has block"
 				return False
 		return True
 
@@ -250,15 +203,46 @@ class CTetrisTest(object):
 
 	def RotateBlock(self, bClockwise):
 		oBlock = self.m_oBlock
-		lPointList = oBlock.GetRotateResult(bClockwise)
+		fRX, fRY = oBlock.GetRotatePoint()
+		if bClockwise:
+			m = (
+				(0, 1, fRX - fRY),
+				(-1, 0, fRX + fRY),
+				(0, 0, 1),
+			)
+		else:
+			m = (
+				(0, -1, fRX + fRY),
+				(1, 0, fRY - fRX),
+				(0, 0, 1),
+			)
+		lPointList = []
+		for iIndex, (iCol, iRow) in enumerate(oBlock.GetPointList()):
+			iResultList = MatrixMulti(m, (iCol, iRow, 1))
+			lPointList.append(iResultList[:2])
+		print "RotateResult", lPointList
 		if not self.CheckValid(lPointList):
 			return
-		oBlock.UpdatePoints(lPointList=lPointList)
+		oBlock.UpdatePoints(lPointList)
 
 	def FallBlock(self, bToBottom=False):
 		oBlock = self.m_oBlock
-		oBlock.Fall(bToBottom=bToBottom)
-		pass
+		iTryTimes = 1 if not bToBottom else (GROUND_GRID_SIZE[1] + 5)
+		lRotatePoint = oBlock.GetRotatePoint()
+		lPointList = [list(lPoint) for lPoint in oBlock.GetPointList()]
+		bChanged = False
+		while iTryTimes > 0:
+			iTryTimes -= 1
+			for lPoint in lPointList:
+				lPoint[1] -= 1
+			lRotatePoint[1] -= 1
+			print "FallResult", lPointList
+			if not self.CheckValid(lPointList):
+				break
+			bChanged = True
+		if bChanged:
+			oBlock.UpdatePoints(lPointList, lRotatePoint=lRotatePoint)
+
 
 	def GetBlock(self):
 		return self.m_oBlock
